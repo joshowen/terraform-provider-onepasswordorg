@@ -30,6 +30,17 @@ func (r Repository) CreateServiceAccount(ctx context.Context, sa model.ServiceAc
 		return nil, fmt.Errorf("could not unmarshal op cli stdout: %w", err)
 	}
 
+	if created.ID == "" {
+		return nil, fmt.Errorf("service account create response missing id")
+	}
+	if created.Token == "" {
+		return nil, fmt.Errorf("service account create response missing token")
+	}
+	// op CLI v2.34+ omits name from the create response; fall back to the input name.
+	if created.Name == "" {
+		created.Name = sa.Name
+	}
+
 	return &model.ServiceAccount{
 		ID:    created.ID,
 		Name:  created.Name,
@@ -38,23 +49,19 @@ func (r Repository) CreateServiceAccount(ctx context.Context, sa model.ServiceAc
 }
 
 func (r Repository) GetServiceAccountByID(ctx context.Context, id string) (*model.ServiceAccount, error) {
+	// op CLI v2.34+ removed the 'service-account get' subcommand. Use ratelimit as an
+	// existence probe: it exits non-zero if the service account does not exist.
+	// The ratelimit response does not include the service account name; the resource's
+	// Read function preserves it from prior Terraform state.
 	cmdArgs := &onePasswordCliCmd{}
-	cmdArgs.ServiceAccountArg().GetArg().RawStrArg(id).FormatJSONFlag()
+	cmdArgs.ServiceAccountArg().RatelimitArg().RawStrArg(id)
 
-	stdout, stderr, err := r.cli.RunOpCmd(ctx, cmdArgs.GetArgs())
+	_, stderr, err := r.cli.RunOpCmd(ctx, cmdArgs.GetArgs())
 	if err != nil {
 		return nil, fmt.Errorf("op cli command failed: %w: %s", err, stderr)
 	}
 
-	var got opServiceAccount
-	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
-		return nil, fmt.Errorf("could not unmarshal op cli stdout: %w", err)
-	}
-
-	return &model.ServiceAccount{
-		ID:   got.ID,
-		Name: got.Name,
-	}, nil
+	return &model.ServiceAccount{ID: id}, nil
 }
 
 func (r Repository) GetServiceAccountByName(ctx context.Context, name string) (*model.ServiceAccount, error) {

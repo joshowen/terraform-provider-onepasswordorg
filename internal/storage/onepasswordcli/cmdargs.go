@@ -137,6 +137,11 @@ func (o *onePasswordCliCmd) CanCreateVaultsFlag() *onePasswordCliCmd {
 	return o
 }
 
+func (o *onePasswordCliCmd) RatelimitArg() *onePasswordCliCmd {
+	o.args = append(o.args, "ratelimit")
+	return o
+}
+
 func (o *onePasswordCliCmd) PermissionsFlag(permissions []string) *onePasswordCliCmd {
 if len(permissions) == 0 {
 return o

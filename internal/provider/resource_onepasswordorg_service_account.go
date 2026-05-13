@@ -125,8 +125,10 @@ func (r *serviceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 	}
 
 	// The API never returns the token after creation, so preserve it from state.
+	// op CLI v2.34+ also no longer returns the name on read; preserve it from state too.
 	readTfSA := mapModelToTfServiceAccount(*sa)
 	readTfSA.Token = state.Token
+	readTfSA.Name = state.Name
 
 	diags = resp.State.Set(ctx, readTfSA)
 	resp.Diagnostics.Append(diags...)

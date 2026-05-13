@@ -36,6 +36,40 @@ func TestRepositoryCreateServiceAccount(t *testing.T) {
 			},
 		},
 
+		"When create response omits name (op CLI v2.34+), should fall back to input name.": {
+			sa: model.ServiceAccount{Name: "ci-bot"},
+			mock: func(m *onepasswordclimock.OpCli) {
+				expCmd := `service-account create ci-bot --can-create-vaults --format json`
+				stdout := `{"id":"SAXXXX","token":"ops_secret_token"}`
+				m.On("RunOpCmd", mock.Anything, strings.Fields(expCmd)).Once().Return(stdout, "", nil)
+			},
+			expSA: &model.ServiceAccount{
+				ID:    "SAXXXX",
+				Name:  "ci-bot",
+				Token: "ops_secret_token",
+			},
+		},
+
+		"When create response omits id, should return an error.": {
+			sa: model.ServiceAccount{Name: "ci-bot"},
+			mock: func(m *onepasswordclimock.OpCli) {
+				expCmd := `service-account create ci-bot --can-create-vaults --format json`
+				stdout := `{"name":"ci-bot","token":"ops_secret_token"}`
+				m.On("RunOpCmd", mock.Anything, strings.Fields(expCmd)).Once().Return(stdout, "", nil)
+			},
+			expErr: true,
+		},
+
+		"When create response omits token, should return an error.": {
+			sa: model.ServiceAccount{Name: "ci-bot"},
+			mock: func(m *onepasswordclimock.OpCli) {
+				expCmd := `service-account create ci-bot --can-create-vaults --format json`
+				stdout := `{"id":"SAXXXX","name":"ci-bot"}`
+				m.On("RunOpCmd", mock.Anything, strings.Fields(expCmd)).Once().Return(stdout, "", nil)
+			},
+			expErr: true,
+		},
+
 		"Having an error while calling the op CLI, should fail.": {
 			sa: model.ServiceAccount{Name: "ci-bot"},
 			mock: func(m *onepasswordclimock.OpCli) {
@@ -77,24 +111,23 @@ func TestRepositoryGetServiceAccountByID(t *testing.T) {
 		expSA  *model.ServiceAccount
 		expErr bool
 	}{
-		"Getting a service account correctly should return the data (without token).": {
+		"Getting a service account by ID should confirm existence via ratelimit (without returning name).": {
 			id: "SAXXXX",
 			mock: func(m *onepasswordclimock.OpCli) {
-				expCmd := `service-account get SAXXXX --format json`
-				stdout := `{"id":"SAXXXX","name":"ci-bot"}`
+				expCmd := `service-account ratelimit SAXXXX`
+				stdout := `{"uuid":"SAXXXX"}`
 				m.On("RunOpCmd", mock.Anything, strings.Fields(expCmd)).Once().Return(stdout, "", nil)
 			},
 			expSA: &model.ServiceAccount{
-				ID:   "SAXXXX",
-				Name: "ci-bot",
+				ID: "SAXXXX",
 			},
 		},
 
-		"Having an error while calling the op CLI, should fail.": {
+		"Having an error while calling the op CLI (e.g. SA not found), should fail.": {
 			id: "SAXXXX",
 			mock: func(m *onepasswordclimock.OpCli) {
-				expCmd := `service-account get SAXXXX --format json`
-				m.On("RunOpCmd", mock.Anything, strings.Fields(expCmd)).Once().Return("", "", fmt.Errorf("something"))
+				expCmd := `service-account ratelimit SAXXXX`
+				m.On("RunOpCmd", mock.Anything, strings.Fields(expCmd)).Once().Return("", "\"SAXXXX\" isn't a service account", fmt.Errorf("exit status 1"))
 			},
 			expErr: true,
 		},
