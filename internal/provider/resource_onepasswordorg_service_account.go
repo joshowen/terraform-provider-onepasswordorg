@@ -118,6 +118,11 @@ func (r *serviceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 	}
 
 	id := state.ID.ValueString()
+	if id == "" {
+		// Corrupted state (e.g. from a failed prior apply) — remove so Terraform can recreate.
+		resp.State.RemoveResource(ctx)
+		return
+	}
 	sa, err := r.repo.GetServiceAccountByID(ctx, id)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading service account", fmt.Sprintf("Could not get service account %q, unexpected error: %s", id, err.Error()))
