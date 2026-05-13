@@ -25,7 +25,7 @@ func TestRepositoryCreateServiceAccount(t *testing.T) {
 		"Creating a service account correctly should return the data including the token.": {
 			sa: model.ServiceAccount{Name: "ci-bot"},
 			mock: func(m *onepasswordclimock.OpCli) {
-				expCmd := `service-account create ci-bot --format json`
+				expCmd := `service-account create ci-bot --can-create-vaults --format json`
 				stdout := `{"id":"SAXXXX","name":"ci-bot","token":"ops_secret_token"}`
 				m.On("RunOpCmd", mock.Anything, strings.Fields(expCmd)).Once().Return(stdout, "", nil)
 			},
@@ -39,7 +39,7 @@ func TestRepositoryCreateServiceAccount(t *testing.T) {
 		"Having an error while calling the op CLI, should fail.": {
 			sa: model.ServiceAccount{Name: "ci-bot"},
 			mock: func(m *onepasswordclimock.OpCli) {
-				expCmd := `service-account create ci-bot --format json`
+				expCmd := `service-account create ci-bot --can-create-vaults --format json`
 				m.On("RunOpCmd", mock.Anything, strings.Fields(expCmd)).Once().Return("", "", fmt.Errorf("something"))
 			},
 			expErr: true,

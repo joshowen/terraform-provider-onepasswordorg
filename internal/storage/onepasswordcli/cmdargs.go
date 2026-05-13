@@ -132,6 +132,11 @@ o.args = append(o.args, "--no-input")
 return o
 }
 
+func (o *onePasswordCliCmd) CanCreateVaultsFlag() *onePasswordCliCmd {
+	o.args = append(o.args, "--can-create-vaults")
+	return o
+}
+
 func (o *onePasswordCliCmd) PermissionsFlag(permissions []string) *onePasswordCliCmd {
 if len(permissions) == 0 {
 return o

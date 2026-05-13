@@ -18,7 +18,7 @@ type opServiceAccount struct {
 
 func (r Repository) CreateServiceAccount(ctx context.Context, sa model.ServiceAccount) (*model.ServiceAccount, error) {
 	cmdArgs := &onePasswordCliCmd{}
-	cmdArgs.ServiceAccountArg().CreateArg().RawStrArg(sa.Name).FormatJSONFlag()
+	cmdArgs.ServiceAccountArg().CreateArg().RawStrArg(sa.Name).CanCreateVaultsFlag().FormatJSONFlag()
 
 	stdout, stderr, err := r.cli.RunOpCmd(ctx, cmdArgs.GetArgs())
 	if err != nil {
