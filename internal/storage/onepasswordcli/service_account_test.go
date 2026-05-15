@@ -50,7 +50,21 @@ func TestRepositoryCreateServiceAccount(t *testing.T) {
 			},
 		},
 
-		"When create response omits id, should return an error.": {
+		"When create response uses uuid instead of id (op CLI v2.34+), should resolve correctly.": {
+			sa: model.ServiceAccount{Name: "ci-bot"},
+			mock: func(m *onepasswordclimock.OpCli) {
+				expCmd := `service-account create ci-bot --can-create-vaults --format json`
+				stdout := `{"uuid":"SAXXXX","name":"ci-bot","token":"ops_secret_token"}`
+				m.On("RunOpCmd", mock.Anything, strings.Fields(expCmd)).Once().Return(stdout, "", nil)
+			},
+			expSA: &model.ServiceAccount{
+				ID:    "SAXXXX",
+				Name:  "ci-bot",
+				Token: "ops_secret_token",
+			},
+		},
+
+		"When create response omits both id and uuid, should return an error.": {
 			sa: model.ServiceAccount{Name: "ci-bot"},
 			mock: func(m *onepasswordclimock.OpCli) {
 				expCmd := `service-account create ci-bot --can-create-vaults --format json`

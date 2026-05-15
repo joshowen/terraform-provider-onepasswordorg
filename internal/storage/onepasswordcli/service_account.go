@@ -10,10 +10,21 @@ import (
 
 // opServiceAccount is the JSON representation returned by the op CLI for service accounts.
 // The Token field is only populated on creation.
+// op CLI v2.34+ uses "uuid" instead of "id"; we accept both.
 type opServiceAccount struct {
 	ID    string `json:"id"`
+	UUID  string `json:"uuid"`
 	Name  string `json:"name"`
 	Token string `json:"token,omitempty"`
+}
+
+// resolveID returns the service account identifier, preferring "id" but
+// falling back to "uuid" for op CLI v2.34+.
+func (o opServiceAccount) resolveID() string {
+	if o.ID != "" {
+		return o.ID
+	}
+	return o.UUID
 }
 
 func (r Repository) CreateServiceAccount(ctx context.Context, sa model.ServiceAccount) (*model.ServiceAccount, error) {
@@ -27,14 +38,15 @@ func (r Repository) CreateServiceAccount(ctx context.Context, sa model.ServiceAc
 
 	var created opServiceAccount
 	if err := json.Unmarshal([]byte(stdout), &created); err != nil {
-		return nil, fmt.Errorf("could not unmarshal op cli stdout: %w", err)
+		return nil, fmt.Errorf("could not unmarshal op cli stdout: %w: raw output: %s", err, stdout)
 	}
 
-	if created.ID == "" {
-		return nil, fmt.Errorf("service account create response missing id")
+	id := created.resolveID()
+	if id == "" {
+		return nil, fmt.Errorf("service account create response missing id/uuid, raw output: %s", stdout)
 	}
 	if created.Token == "" {
-		return nil, fmt.Errorf("service account create response missing token")
+		return nil, fmt.Errorf("service account create response missing token, raw output: %s", stdout)
 	}
 	// op CLI v2.34+ omits name from the create response; fall back to the input name.
 	if created.Name == "" {
@@ -42,7 +54,7 @@ func (r Repository) CreateServiceAccount(ctx context.Context, sa model.ServiceAc
 	}
 
 	return &model.ServiceAccount{
-		ID:    created.ID,
+		ID:    id,
 		Name:  created.Name,
 		Token: created.Token,
 	}, nil
