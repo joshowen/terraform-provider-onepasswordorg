@@ -72,25 +72,10 @@ func mapTfToModelVault(v Vault) model.Vault {
 }
 
 type ServiceAccount struct {
-	ID    types.String `tfsdk:"id"`
-	Name  types.String `tfsdk:"name"`
-	Token types.String `tfsdk:"token"`
-}
-
-func mapModelToTfServiceAccount(sa model.ServiceAccount) ServiceAccount {
-	return ServiceAccount{
-		ID:    types.StringValue(sa.ID),
-		Name:  types.StringValue(sa.Name),
-		Token: types.StringValue(sa.Token),
-	}
-}
-
-func mapTfToModelServiceAccount(sa ServiceAccount) model.ServiceAccount {
-	return model.ServiceAccount{
-		ID:    sa.ID.ValueString(),
-		Name:  sa.Name.ValueString(),
-		Token: sa.Token.ValueString(),
-	}
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Token       types.String `tfsdk:"token"`
+	VaultAccess types.Map    `tfsdk:"vault_access"`
 }
 
 type Member struct {
@@ -112,13 +97,6 @@ type VaultUserAccess struct {
 	VaultID     types.String       `tfsdk:"vault_id"`
 	UserID      types.String       `tfsdk:"user_id"`
 	Permissions *AccessPermissions `tfsdk:"permissions"`
-}
-
-type VaultServiceAccountAccess struct {
-	ID               types.String       `tfsdk:"id"`
-	VaultID          types.String       `tfsdk:"vault_id"`
-	ServiceAccountID types.String       `tfsdk:"service_account_id"`
-	Permissions      *AccessPermissions `tfsdk:"permissions"`
 }
 
 type AccessPermissions struct {

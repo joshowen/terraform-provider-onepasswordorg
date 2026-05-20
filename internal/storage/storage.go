@@ -37,10 +37,6 @@ EnsureVaultUserAccess(ctx context.Context, userAccess model.VaultUserAccess) err
 DeleteVaultUserAccess(ctx context.Context, vaultID string, userID string) error
 GetVaultUserAccessByID(ctx context.Context, vaultID string, userID string) (*model.VaultUserAccess, error)
 
-EnsureVaultServiceAccountAccess(ctx context.Context, saAccess model.VaultServiceAccountAccess) error
-DeleteVaultServiceAccountAccess(ctx context.Context, vaultID string, serviceAccountID string) error
-GetVaultServiceAccountAccessByID(ctx context.Context, vaultID string, serviceAccountID string) (*model.VaultServiceAccountAccess, error)
-
 CreateServiceAccount(ctx context.Context, sa model.ServiceAccount) (*model.ServiceAccount, error)
 GetServiceAccountByID(ctx context.Context, id string) (*model.ServiceAccount, error)
 GetServiceAccountByName(ctx context.Context, name string) (*model.ServiceAccount, error)

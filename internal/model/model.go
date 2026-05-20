@@ -48,17 +48,31 @@ UserID      string
 Permissions AccessPermissions
 }
 
-type VaultServiceAccountAccess struct {
-VaultID          string
-ServiceAccountID string
-Permissions      AccessPermissions
-}
+// ServiceAccountVaultPermission is one of the limited permissions that 1Password
+// allows when granting a service account access to a vault at creation time.
+// Valid values: "read_items", "write_items", "share_items". "write_items" and
+// "share_items" both require "read_items".
+type ServiceAccountVaultPermission string
+
+const (
+ServiceAccountVaultPermissionReadItems  ServiceAccountVaultPermission = "read_items"
+ServiceAccountVaultPermissionWriteItems ServiceAccountVaultPermission = "write_items"
+ServiceAccountVaultPermissionShareItems ServiceAccountVaultPermission = "share_items"
+)
 
 // ServiceAccount represents a 1password service account.
+//
+// VaultAccess maps a vault identifier (name or UUID, as accepted by
+// `op service-account create --vault`) to the set of permissions the service
+// account should have on that vault. The 1Password CLI only allows configuring
+// vault access at service-account creation time; therefore any change to
+// VaultAccess (including adding/removing a vault or changing its permissions)
+// requires destroying and recreating the service account.
 type ServiceAccount struct {
-ID    string
-Name  string
-Token string // Only available at creation time.
+ID          string
+Name        string
+Token       string // Only available at creation time.
+VaultAccess map[string][]ServiceAccountVaultPermission
 }
 
 // More information in https://developer.1password.com/docs/cli/vault-permissions.

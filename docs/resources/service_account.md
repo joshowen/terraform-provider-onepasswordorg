@@ -19,6 +19,11 @@ creation, so it must be captured from state immediately after the resource is cr
 ~> **Note:** Changing the name of a service account forces the creation of a new resource because 1Password
 does not support renaming service accounts via the CLI.
 
+~> **Note:** The `vault_access` map is configurable only at service account creation time; the
+1Password CLI does not expose a command to add, remove, or modify a service account's vault access after the
+fact. Any change to `vault_access` therefore destroys and recreates the service account, which
+generates a **new bearer token**. Downstream consumers of the token must be updated accordingly.
+
 ~> **Note:** The `token` attribute is sensitive and stored in Terraform state. Protect your state file accordingly.
 If you import an existing service account, the token will be empty because it cannot be retrieved.
 
@@ -27,6 +32,13 @@ If you import an existing service account, the token will be empty because it ca
 ```terraform
 resource "onepasswordorg_service_account" "ci_bot" {
   name = "ci-bot"
+
+  vault_access = {
+    # Map key is the vault name or UUID; value is the set of permissions.
+    # Allowed permissions: read_items, write_items, share_items.
+    # write_items and share_items each require read_items.
+    "Shared CI" = ["read_items", "write_items"]
+  }
 }
 
 # Access the token (sensitive) for use elsewhere, e.g. a Kubernetes secret.
@@ -42,6 +54,14 @@ output "ci_bot_token" {
 ### Required
 
 - `name` (String) The name of the service account.
+
+### Optional
+
+- `vault_access` (Map of Set of String) Vaults this service account can access, configured at creation time.
+  Keys are vault names or UUIDs; values are the set of permissions. Allowed permissions: `read_items`,
+  `write_items`, `share_items`. `write_items` and `share_items` each require `read_items`. Vault identifiers
+  must not contain `:` or `,` (used as delimiters by the CLI). Any change forces resource replacement and
+  rotates the bearer token.
 
 ### Read-Only
 

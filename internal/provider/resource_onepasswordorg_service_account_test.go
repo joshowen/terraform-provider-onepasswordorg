@@ -82,7 +82,142 @@ resource "onepasswordorg_service_account" "test_sa" {
 	}
 }
 
-// TestAccServiceAccountNameChangeReplace checks that changing the name recreates the resource.
+// TestAccServiceAccountVaultAccess verifies that vault_access is round-tripped
+// through state and forces replacement on change.
+func TestAccServiceAccountVaultAccess(t *testing.T) {
+	// Prepare fake storage.
+	path, deleteFn := getFakeRepoTmpFile("TestAccServiceAccountVaultAccess")
+	defer deleteFn()
+	_ = os.Setenv(provider.EnvVarOpFakeStoragePath, path)
+
+	configCreate := `
+resource "onepasswordorg_service_account" "test_sa" {
+  name = "ci-bot"
+
+  vault_access = {
+    "vault-alpha" = ["read_items", "write_items"]
+    "vault-beta"  = ["read_items"]
+  }
+}
+`
+	configReplace := `
+resource "onepasswordorg_service_account" "test_sa" {
+  name = "ci-bot"
+
+  vault_access = {
+    "vault-alpha" = ["read_items"]
+  }
+}
+`
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: configCreate,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("onepasswordorg_service_account.test_sa", "name", "ci-bot"),
+					resource.TestCheckResourceAttr("onepasswordorg_service_account.test_sa", "vault_access.vault-alpha.#", "2"),
+					resource.TestCheckResourceAttr("onepasswordorg_service_account.test_sa", "vault_access.vault-beta.#", "1"),
+				),
+			},
+			{
+				// Changing vault_access must force replacement (destroy + create).
+				Config: configReplace,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("onepasswordorg_service_account.test_sa", "vault_access.vault-alpha.#", "1"),
+					resource.TestCheckNoResourceAttr("onepasswordorg_service_account.test_sa", "vault_access.vault-beta"),
+				),
+			},
+		},
+	})
+}
+
+// TestAccServiceAccountVaultAccessValidation checks the config validator that
+// enforces permission allowed-values, the write_items/share_items → read_items
+// dependency, and the vault-identifier escape rule.
+func TestAccServiceAccountVaultAccessValidation(t *testing.T) {
+	tests := map[string]struct {
+		config string
+		expErr *regexp.Regexp
+	}{
+		"Unknown permission should fail.": {
+			config: `
+resource "onepasswordorg_service_account" "test_sa" {
+  name = "ci-bot"
+  vault_access = {
+    "vault-alpha" = ["bogus_perm"]
+  }
+}
+`,
+			expErr: regexp.MustCompile(`(?s)Invalid service account vault permission`),
+		},
+		"write_items without read_items should fail.": {
+			config: `
+resource "onepasswordorg_service_account" "test_sa" {
+  name = "ci-bot"
+  vault_access = {
+    "vault-alpha" = ["write_items"]
+  }
+}
+`,
+			expErr: regexp.MustCompile(`(?s)Missing required service account vault permission`),
+		},
+		"share_items without read_items should fail.": {
+			config: `
+resource "onepasswordorg_service_account" "test_sa" {
+  name = "ci-bot"
+  vault_access = {
+    "vault-alpha" = ["share_items"]
+  }
+}
+`,
+			expErr: regexp.MustCompile(`(?s)Missing required service account vault permission`),
+		},
+		"Vault identifier with ':' should fail.": {
+			config: `
+resource "onepasswordorg_service_account" "test_sa" {
+  name = "ci-bot"
+  vault_access = {
+    "bad:vault" = ["read_items"]
+  }
+}
+`,
+			expErr: regexp.MustCompile(`(?s)Invalid vault identifier`),
+		},
+		"Vault identifier with ',' should fail.": {
+			config: `
+resource "onepasswordorg_service_account" "test_sa" {
+  name = "ci-bot"
+  vault_access = {
+    "bad,vault" = ["read_items"]
+  }
+}
+`,
+			expErr: regexp.MustCompile(`(?s)Invalid vault identifier`),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			path, deleteFn := getFakeRepoTmpFile("TestAccServiceAccountVaultAccessValidation")
+			defer deleteFn()
+			_ = os.Setenv(provider.EnvVarOpFakeStoragePath, path)
+
+			resource.Test(t, resource.TestCase{
+				PreCheck:                 func() { testAccPreCheck(t) },
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Steps: []resource.TestStep{
+					{
+						Config:      test.config,
+						ExpectError: test.expErr,
+					},
+				},
+			})
+		})
+	}
+}
 func TestAccServiceAccountNameChangeReplace(t *testing.T) {
 	// Prepare fake storage.
 	path, deleteFn := getFakeRepoTmpFile("TestAccServiceAccountNameChangeReplace")

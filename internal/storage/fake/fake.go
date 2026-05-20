@@ -19,7 +19,6 @@ membershipByID                map[string]model.Membership
 vaultsByID                    map[string]model.Vault
 vaultGroupAccessByID          map[string]model.VaultGroupAccess
 vaultUserAccessByID           map[string]model.VaultUserAccess
-vaultServiceAccountAccessByID map[string]model.VaultServiceAccountAccess
 serviceAccountsByID           map[string]model.ServiceAccount
 storageMu                     sync.RWMutex
 }
@@ -57,11 +56,6 @@ if fks != nil && fks.VaultUserAccess != nil {
 vaultUserAccess = fks.VaultUserAccess
 }
 
-vaultServiceAccountAccess := map[string]model.VaultServiceAccountAccess{}
-if fks != nil && fks.VaultServiceAccountAccess != nil {
-vaultServiceAccountAccess = fks.VaultServiceAccountAccess
-}
-
 serviceAccounts := map[string]model.ServiceAccount{}
 if fks != nil && fks.ServiceAccounts != nil {
 serviceAccounts = fks.ServiceAccounts
@@ -75,7 +69,6 @@ membershipByID:                members,
 vaultsByID:                    vaults,
 vaultGroupAccessByID:          vaultGroupAccess,
 vaultUserAccessByID:           vaultUserAccess,
-vaultServiceAccountAccessByID: vaultServiceAccountAccess,
 serviceAccountsByID:           serviceAccounts,
 }, nil
 }
@@ -491,59 +484,6 @@ return nil, fmt.Errorf("vault access doesn't exists")
 return &v, nil
 }
 
-func (r *repository) getVaultServiceAccountAccessID(vaultID, serviceAccountID string) string {
-return vaultID + "/" + serviceAccountID
-}
-
-func (r *repository) EnsureVaultServiceAccountAccess(ctx context.Context, saAccess model.VaultServiceAccountAccess) error {
-r.storageMu.Lock()
-defer r.storageMu.Unlock()
-
-id := r.getVaultServiceAccountAccessID(saAccess.VaultID, saAccess.ServiceAccountID)
-r.vaultServiceAccountAccessByID[id] = saAccess
-
-err := r.dumpStorage()
-if err != nil {
-return err
-}
-
-return nil
-}
-
-func (r *repository) DeleteVaultServiceAccountAccess(ctx context.Context, vaultID string, serviceAccountID string) error {
-r.storageMu.Lock()
-defer r.storageMu.Unlock()
-
-id := r.getVaultServiceAccountAccessID(vaultID, serviceAccountID)
-
-_, ok := r.vaultServiceAccountAccessByID[id]
-if !ok {
-return fmt.Errorf("vault service account access doesn't exists")
-}
-
-delete(r.vaultServiceAccountAccessByID, id)
-
-err := r.dumpStorage()
-if err != nil {
-return err
-}
-
-return nil
-}
-
-func (r *repository) GetVaultServiceAccountAccessByID(ctx context.Context, vaultID string, serviceAccountID string) (*model.VaultServiceAccountAccess, error) {
-r.storageMu.RLock()
-defer r.storageMu.RUnlock()
-
-id := r.getVaultServiceAccountAccessID(vaultID, serviceAccountID)
-v, ok := r.vaultServiceAccountAccessByID[id]
-if !ok {
-return nil, fmt.Errorf("vault service account access doesn't exists")
-}
-
-return &v, nil
-}
-
 func (r *repository) CreateServiceAccount(ctx context.Context, sa model.ServiceAccount) (*model.ServiceAccount, error) {
 r.storageMu.Lock()
 defer r.storageMu.Unlock()
@@ -605,26 +545,24 @@ return r.dumpStorage()
 }
 
 type fakeStorage struct {
-Users                     map[string]model.User
-Groups                    map[string]model.Group
-Members                   map[string]model.Membership
-Vaults                    map[string]model.Vault
-VaultGroupAccess          map[string]model.VaultGroupAccess
-VaultUserAccess           map[string]model.VaultUserAccess
-VaultServiceAccountAccess map[string]model.VaultServiceAccountAccess
-ServiceAccounts           map[string]model.ServiceAccount
+Users            map[string]model.User
+Groups           map[string]model.Group
+Members          map[string]model.Membership
+Vaults           map[string]model.Vault
+VaultGroupAccess map[string]model.VaultGroupAccess
+VaultUserAccess  map[string]model.VaultUserAccess
+ServiceAccounts  map[string]model.ServiceAccount
 }
 
 func (r *repository) dumpStorage() error {
 fks := fakeStorage{
-Users:                     r.usersByID,
-Groups:                    r.groupsByID,
-Members:                   r.membershipByID,
-Vaults:                    r.vaultsByID,
-VaultGroupAccess:          r.vaultGroupAccessByID,
-VaultUserAccess:           r.vaultUserAccessByID,
-VaultServiceAccountAccess: r.vaultServiceAccountAccessByID,
-ServiceAccounts:           r.serviceAccountsByID,
+Users:            r.usersByID,
+Groups:           r.groupsByID,
+Members:          r.membershipByID,
+Vaults:           r.vaultsByID,
+VaultGroupAccess: r.vaultGroupAccessByID,
+VaultUserAccess:  r.vaultUserAccessByID,
+ServiceAccounts:  r.serviceAccountsByID,
 }
 
 data, err := json.MarshalIndent(fks, "", "\t")

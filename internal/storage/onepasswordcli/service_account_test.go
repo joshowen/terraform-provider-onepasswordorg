@@ -92,6 +92,41 @@ func TestRepositoryCreateServiceAccount(t *testing.T) {
 			},
 			expErr: true,
 		},
+
+		"Creating with vault_access should emit one --vault flag per vault, in sorted key order.": {
+			sa: model.ServiceAccount{
+				Name: "ci-bot",
+				VaultAccess: map[string][]model.ServiceAccountVaultPermission{
+					"zebra-vault": {model.ServiceAccountVaultPermissionReadItems},
+					"alpha-vault": {
+						model.ServiceAccountVaultPermissionReadItems,
+						model.ServiceAccountVaultPermissionWriteItems,
+					},
+				},
+			},
+			mock: func(m *onepasswordclimock.OpCli) {
+				expCmd := []string{
+					"service-account", "create", "ci-bot",
+					"--can-create-vaults", "--format", "json",
+					"--vault", "alpha-vault:read_items,write_items",
+					"--vault", "zebra-vault:read_items",
+				}
+				stdout := `{"id":"SAXXXX","name":"ci-bot","token":"ops_secret_token"}`
+				m.On("RunOpCmd", mock.Anything, expCmd).Once().Return(stdout, "", nil)
+			},
+			expSA: &model.ServiceAccount{
+				ID:    "SAXXXX",
+				Name:  "ci-bot",
+				Token: "ops_secret_token",
+				VaultAccess: map[string][]model.ServiceAccountVaultPermission{
+					"zebra-vault": {model.ServiceAccountVaultPermissionReadItems},
+					"alpha-vault": {
+						model.ServiceAccountVaultPermissionReadItems,
+						model.ServiceAccountVaultPermissionWriteItems,
+					},
+				},
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -180,7 +215,7 @@ func TestRepositoryDeleteServiceAccount(t *testing.T) {
 		"Deleting a service account correctly should succeed.": {
 			id: "SAXXXX",
 			mock: func(m *onepasswordclimock.OpCli) {
-				expCmd := `service-account delete SAXXXX`
+				expCmd := `user delete SAXXXX`
 				m.On("RunOpCmd", mock.Anything, strings.Fields(expCmd)).Once().Return("", "", nil)
 			},
 		},
@@ -188,7 +223,7 @@ func TestRepositoryDeleteServiceAccount(t *testing.T) {
 		"Having an error while calling the op CLI, should fail.": {
 			id: "SAXXXX",
 			mock: func(m *onepasswordclimock.OpCli) {
-				expCmd := `service-account delete SAXXXX`
+				expCmd := `user delete SAXXXX`
 				m.On("RunOpCmd", mock.Anything, strings.Fields(expCmd)).Once().Return("", "", fmt.Errorf("something"))
 			},
 			expErr: true,

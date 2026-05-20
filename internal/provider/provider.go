@@ -279,7 +279,6 @@ func (p *onePasswordOrgProvider) Resources(ctx context.Context) []func() resourc
 		NewVaultUserAccessResource,
 		NewVaultGroupAccessResource,
 		NewServiceAccountResource,
-		NewVaultServiceAccountAccessResource,
 	}
 }
 

@@ -1,6 +1,10 @@
 package onepasswordcli
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/slok/terraform-provider-onepasswordorg/internal/model"
+)
 
 type onePasswordCliCmd struct {
 args []string
@@ -139,6 +143,19 @@ func (o *onePasswordCliCmd) CanCreateVaultsFlag() *onePasswordCliCmd {
 
 func (o *onePasswordCliCmd) RatelimitArg() *onePasswordCliCmd {
 	o.args = append(o.args, "ratelimit")
+	return o
+}
+
+// ServiceAccountVaultFlag appends a `--vault <name>:<perm>,<perm>` flag, used by
+// `op service-account create` to grant the service account access to a vault
+// at creation time. Permissions are joined verbatim in the order provided;
+// callers should sort to produce a deterministic command line.
+func (o *onePasswordCliCmd) ServiceAccountVaultFlag(vault string, permissions []model.ServiceAccountVaultPermission) *onePasswordCliCmd {
+	perms := make([]string, 0, len(permissions))
+	for _, p := range permissions {
+		perms = append(perms, string(p))
+	}
+	o.args = append(o.args, "--vault", vault+":"+strings.Join(perms, ","))
 	return o
 }
 

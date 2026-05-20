@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	"github.com/slok/terraform-provider-onepasswordorg/internal/model"
 )
@@ -31,6 +32,18 @@ func (r Repository) CreateServiceAccount(ctx context.Context, sa model.ServiceAc
 	cmdArgs := &onePasswordCliCmd{}
 	cmdArgs.ServiceAccountArg().CreateArg().RawStrArg(sa.Name).CanCreateVaultsFlag().FormatJSONFlag()
 
+	// Vault access is configurable only at creation time via repeated `--vault`
+	// flags. Iterate in sorted-key order so command construction is
+	// deterministic (helps tests and debug output).
+	vaultNames := make([]string, 0, len(sa.VaultAccess))
+	for name := range sa.VaultAccess {
+		vaultNames = append(vaultNames, name)
+	}
+	sort.Strings(vaultNames)
+	for _, name := range vaultNames {
+		cmdArgs.ServiceAccountVaultFlag(name, sa.VaultAccess[name])
+	}
+
 	stdout, stderr, err := r.cli.RunOpCmd(ctx, cmdArgs.GetArgs())
 	if err != nil {
 		return nil, fmt.Errorf("op cli command failed: %w: %s", err, stderr)
@@ -54,9 +67,10 @@ func (r Repository) CreateServiceAccount(ctx context.Context, sa model.ServiceAc
 	}
 
 	return &model.ServiceAccount{
-		ID:    id,
-		Name:  created.Name,
-		Token: created.Token,
+		ID:          id,
+		Name:        created.Name,
+		Token:       created.Token,
+		VaultAccess: sa.VaultAccess,
 	}, nil
 }
 
@@ -81,8 +95,12 @@ func (r Repository) GetServiceAccountByName(ctx context.Context, name string) (*
 }
 
 func (r Repository) DeleteServiceAccount(ctx context.Context, id string) error {
+	// op CLI v2.34's `service-account` subcommand only exposes `create` and
+	// `ratelimit`; there is no `service-account delete`. Service accounts
+	// appear as users in `op user list`, so deletion goes through
+	// `op user delete <SA-ID>`.
 	cmdArgs := &onePasswordCliCmd{}
-	cmdArgs.ServiceAccountArg().DeleteArg().RawStrArg(id)
+	cmdArgs.UserArg().DeleteArg().RawStrArg(id)
 
 	_, stderr, err := r.cli.RunOpCmd(ctx, cmdArgs.GetArgs())
 	if err != nil {
