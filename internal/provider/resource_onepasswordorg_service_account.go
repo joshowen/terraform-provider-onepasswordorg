@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/slok/terraform-provider-onepasswordorg/internal/model"
 	"github.com/slok/terraform-provider-onepasswordorg/internal/storage"
@@ -221,6 +222,11 @@ func (r *serviceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 	}
 	sa, err := r.repo.GetServiceAccountByID(ctx, id)
 	if err != nil {
+		if isNotFoundError(err) {
+			tflog.Warn(ctx, "Service account not found remotely, removing from state", map[string]interface{}{"id": id})
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Error reading service account", fmt.Sprintf("Could not get service account %q, unexpected error: %s", id, err.Error()))
 		return
 	}
@@ -260,8 +266,12 @@ func (r *serviceAccountResource) Delete(ctx context.Context, req resource.Delete
 	id := tfSA.ID.ValueString()
 	err := r.repo.DeleteServiceAccount(ctx, id)
 	if err != nil {
-		resp.Diagnostics.AddError("Error deleting service account", fmt.Sprintf("Could not delete service account %q, unexpected error: %s", id, err.Error()))
-		return
+		if isNotFoundError(err) {
+			tflog.Warn(ctx, "Service account already deleted remotely, removing from state", map[string]interface{}{"id": id})
+		} else {
+			resp.Diagnostics.AddError("Error deleting service account", fmt.Sprintf("Could not delete service account %q, unexpected error: %s", id, err.Error()))
+			return
+		}
 	}
 
 	resp.State.RemoveResource(ctx)
@@ -358,4 +368,18 @@ func contains(haystack []string, needle string) bool {
 		}
 	}
 	return false
+}
+
+// isNotFoundError returns true if the error indicates the remote resource was
+// not found (HTTP 404 / op CLI exit status 4). This allows Read and Delete to
+// handle already-removed resources gracefully.
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "Not Found") ||
+		strings.Contains(msg, "not found") ||
+		strings.Contains(msg, "isn't a service account") ||
+		strings.Contains(msg, "isn't a user")
 }
